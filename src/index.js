@@ -9,34 +9,91 @@ app.use(cors());
 
 const users = [];
 
+function isUUID(id){
+
+  const regexExp = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
+
+return regexExp.test(id); 
+}
+
 function checksExistsUserAccount(request, response, next) {
-  const {username} = request.body;
+  const {username} = request.headers;
+  const user = users.find(user => user.username === username);
 
-  const usernameAlreadyExists = users.some((user) => user.username === username);
-
-  if(usernameAlreadyExists){
-    return response.status(400).json({"Error": "Users already exist"})
+  if (!user) {
+    return response.status(404).json({error : "Username already exist"}) 
   }
 
-  request.users = users;
+  request.user = user;
 
   return next();
 }
 
 function checksCreateTodosUserAvailability(request, response, next) {
-  // Complete aqui
+  const {user} = request;
+  const userFree = user.pro;
+  const max10Tasks = user.todos.length;
+  if (!userFree && max10Tasks >= 10){
+    return response.status(403).json({error : "Maximum of 10 Tasks registered! Upgrade to the pro plan and get all the benefits."}) 
+  }
+ 
+  request.user = user;
+
+  return next();
 }
 
 function checksTodoExists(request, response, next) {
-  // Complete aqui
+  const {username} = request.headers;
+  const {id} = request.params;
+
+  if(!isUUID(id)){
+    return response.status(400).json({error : "Parameter 'id' invalid"});
+  }
+
+  const user = users.find(user=> user.username === username);
+
+  if(!user) {
+    return response.status(404).json({error : "User not found"});
+  }
+
+  const todo = user.todos.find(todo => todo.id === id);
+
+  if(!todo) {
+    return response.status(404).json({error : "Tasks not found"})
+  }
+  request.user = user;
+  request.todo = todo;
+  console.log(todo)
+  return next();
+
 }
 
 function findUserById(request, response, next) {
-  // Complete aqui
+  const { id } = request.params;
+
+  if(!isUUID(id)){
+    return response.status(400).json({error : "Parameter 'id' invalid"});
+  }
+
+  const user = users.find(user => user.id === id);
+
+  if (!user) {
+    return response.status(404).json({error : "User not found"}); 
+  }
+
+  request.user = user;
+
+  return next();
 }
 
-app.post('/users', checksExistsUserAccount, (request, response) => {
+app.post('/users', (request, response) => {
   const { name, username } = request.body;
+
+  const usernameAlreadyExists = users.some((user) => user.username === username);
+
+  if (usernameAlreadyExists) {
+    return response.status(400).json({ error: 'Username already exists' });
+  }
 
   const user = {
     id: uuidv4(),
@@ -98,7 +155,7 @@ app.put('/todos/:id', checksTodoExists, (request, response) => {
 
   todo.title = title;
   todo.deadline = new Date(deadline);
-
+  
   return response.json(todo);
 });
 
